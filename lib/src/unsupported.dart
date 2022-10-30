@@ -7,10 +7,11 @@ class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
   const EasyWebView({
     Key? key,
     required this.src,
-    required this.onLoaded,
+    this.onLoaded,
     this.height,
     this.width,
     this.webAllowFullScreen = true,
+    this.allow = "",
     this.isHtml = false,
     this.isMarkdown = false,
     this.convertToWidgets = false,
@@ -37,6 +38,9 @@ class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
   final bool webAllowFullScreen;
 
   @override
+  final String allow;
+
+  @override
   final bool isMarkdown;
 
   @override
@@ -52,7 +56,7 @@ class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
   final bool widgetsTextSelectable;
 
   @override
-  final void Function() onLoaded;
+  final OnLoaded? onLoaded;
 
   @override
   final List<CrossWindowEvent> crossWindowEvents;

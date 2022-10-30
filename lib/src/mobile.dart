@@ -6,14 +6,38 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import 'impl.dart';
 
+class EasyWebViewControllerWrapper extends EasyWebViewControllerWrapperBase {
+  final WebViewController _controller;
+
+  EasyWebViewControllerWrapper._(this._controller);
+
+  @override
+  Future<void> evaluateJSMobile(String js) {
+    return _controller.runJavascript(js);
+  }
+
+  @override
+  Future<String> evaluateJSWithResMobile(String js) {
+    return _controller.runJavascriptReturningResult(js);
+  }
+
+  @override
+  Object get nativeWrapper => _controller;
+
+  @override
+  void postMessageWeb(dynamic message, String targetOrigin) =>
+      throw UnsupportedError("the platform doesn't support this operation");
+}
+
 class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
   const EasyWebView({
     required this.src,
-    required this.onLoaded,
+    this.onLoaded,
     Key? key,
     this.height,
     this.width,
     this.webAllowFullScreen = true,
+    this.allow = "",
     this.isHtml = false,
     this.isMarkdown = false,
     this.convertToWidgets = false,
@@ -28,6 +52,9 @@ class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
   _EasyWebViewState createState() => _EasyWebViewState();
 
   @override
+  final OnLoaded? onLoaded;
+
+  @override
   final double? height;
 
   @override
@@ -38,6 +65,9 @@ class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
 
   @override
   final bool webAllowFullScreen;
+
+  @override
+  final String allow;
 
   @override
   final bool isMarkdown;
@@ -55,9 +85,6 @@ class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
   final bool widgetsTextSelectable;
 
   @override
-  final void Function() onLoaded;
-
-  @override
   final List<CrossWindowEvent> crossWindowEvents;
 
   @override
@@ -65,7 +92,7 @@ class EasyWebView extends StatefulWidget implements EasyWebViewImpl {
 }
 
 class _EasyWebViewState extends State<EasyWebView> {
-  late WebViewController _webViewController;
+  WebViewController? _webViewController;
 
   @override
   void initState() {
@@ -78,7 +105,7 @@ class _EasyWebViewState extends State<EasyWebView> {
   @override
   void didUpdateWidget(EasyWebView oldWidget) {
     if (oldWidget.src != widget.src) {
-      _webViewController.loadUrl(_updateUrl(widget.src),
+      _webViewController?.loadUrl(_updateUrl(widget.src),
           headers: widget.headers);
     }
     if (oldWidget.height != widget.height) {
@@ -100,7 +127,10 @@ class _EasyWebViewState extends State<EasyWebView> {
       _src = "data:text/html;charset=utf-8," +
           Uri.encodeComponent(EasyWebViewImpl.wrapHtml(url));
     }
-    widget.onLoaded();
+    if (_webViewController != null) {
+      widget.onLoaded
+          ?.call(EasyWebViewControllerWrapper._(_webViewController!));
+    }
     return _src;
   }
 
@@ -137,8 +167,8 @@ class _EasyWebViewState extends State<EasyWebView> {
           initialUrl: _updateUrl(src),
           javascriptMode: JavascriptMode.unrestricted,
           onWebViewCreated: (webViewController) {
-            _webViewController = webViewController;
-            widget.onLoaded();
+            widget.onLoaded?.call(EasyWebViewControllerWrapper._(
+                _webViewController = webViewController));
           },
           navigationDelegate: (navigationRequest) async {
             if (widget.webNavigationDelegate == null) {
@@ -151,17 +181,15 @@ class _EasyWebViewState extends State<EasyWebView> {
                 ? NavigationDecision.prevent
                 : NavigationDecision.navigate;
           },
-          javascriptChannels: widget.crossWindowEvents.isNotEmpty
-              ? widget.crossWindowEvents
-                  .map(
-                    (crossWindowEvent) => JavascriptChannel(
-                      name: crossWindowEvent.name,
-                      onMessageReceived: (javascriptMessage) => crossWindowEvent
-                          .eventAction(javascriptMessage.message),
-                    ),
-                  )
-                  .toSet()
-              : Set<JavascriptChannel>(),
+          javascriptChannels: widget.crossWindowEvents
+              .map(
+                (crossWindowEvent) => JavascriptChannel(
+                  name: crossWindowEvent.name,
+                  onMessageReceived: (javascriptMessage) =>
+                      crossWindowEvent.eventAction(javascriptMessage.message),
+                ),
+              )
+              .toSet(),
         );
       },
     );
